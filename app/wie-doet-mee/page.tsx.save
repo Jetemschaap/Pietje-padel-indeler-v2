@@ -1,0 +1,87 @@
+nano app/wie-doet-mee/page.tsx
+nano app/wie-doet-mee/page.t
+cat > app/wie-doet-mee/page.tsx <<'EOF'
+"use client";
+
+import { useState } from "react";
+
+type Speler = {
+  naam: string;
+  foto: string;
+};
+
+const spelers: Speler[] = [
+  { naam: "Piet", foto: "/players/piet.jpg" },
+  { naam: "Jan", foto: "/players/jan.jpg" },
+  { naam: "Klaas", foto: "/players/klaas.jpg" },
+  { naam: "Dirk", foto: "/players/dirk.jpg" },
+];
+
+export default function WieDoetMee() {
+  const [geselecteerd, setGeselecteerd] = useState<string[]>(
+    spelers.map((s) => s.naam)
+  );
+
+  function toggle(naam: string) {
+    setGeselecteerd((prev) =>
+      prev.includes(naam)
+        ? prev.filter((n) => n !== naam)
+        : [...prev, naam]
+    );
+  }
+
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        padding: 20,
+        backgroundColor: "#000",
+        color: "#fff",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+          gap: 12,
+        }}
+      >
+        {spelers.map((s) => {
+          const aan = geselecteerd.includes(s.naam);
+
+          return (
+            <div
+              key={s.naam}
+              onClick={() => toggle(s.naam)}
+              style={{
+                borderRadius: 16,
+                overflow: "hidden",
+                cursor: "pointer",
+                textAlign: "center",
+                border: aan
+                  ? "4px solid #facc15"
+                  : "4px solid transparent",
+                opacity: aan ? 1 : 0.35,
+              }}
+            >
+              <img
+                src={s.foto}
+                alt={s.naam}
+                style={{
+                  width: "100%",
+                  height: 140,
+                  objectFit: "cover",
+                  background: "#333",
+                }}
+              />
+              <div style={{ padding: 8, fontWeight: 800 }}>
+                {s.naam}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+EOF
