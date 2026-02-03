@@ -259,7 +259,8 @@ export default function Banen() {
   const [hourIndex, setHourIndex] = useState<number>(0);
 
   const prevSpecialNames = useMemo(() => {
-    const raw = typeof window !== "undefined" ? localStorage.getItem("pietje_prev_special") : null;
+    if (typeof window === "undefined") return new Set<string>();
+    const raw = localStorage.getItem("pietje_prev_special");
     const arr: string[] = raw ? JSON.parse(raw) : [];
     return new Set(arr);
   }, [hourIndex]);
@@ -279,7 +280,6 @@ export default function Banen() {
     setBanen(letters);
     setHourIndex(h);
 
-    // ✅ VERDELING alleen gebruiken als dit echt 6 of 11 is (anders is het oude rommel)
     const verdelingRaw = localStorage.getItem("pietje_verdeling");
     const verdeling: number[] | null = verdelingRaw ? JSON.parse(verdelingRaw) : null;
 
@@ -299,7 +299,6 @@ export default function Banen() {
       setBaanMap(map);
       localStorage.setItem("pietje_prev_special", JSON.stringify([]));
     } else {
-      // als er nog oude verdeling hangt: weg ermee
       localStorage.removeItem("pietje_verdeling");
 
       const ordered = shuffle([...s]);
@@ -313,16 +312,27 @@ export default function Banen() {
   }, []);
 
   function volgendUur() {
-  localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
+    if (banen.length === 0) return;
 
-  if (banen.length === 0) return;
+    const nextHour = hourIndex + 1;
 
-  const nextHour = hourIndex + 1;
+    // ✅ belangrijke afspraak:
+    // - aanwezigen blijven hetzelfde (dus pietje_spelers bewaren)
+    // - vaste kleuren worden leeggemaakt (dus alles grijs)
+    // - daarna terug naar /wie-doet-mee met restore=1
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pietje_spelers", JSON.stringify(spelers));
+      localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
+      localStorage.setItem("pietje_restore", "1");
+      localStorage.setItem("pietje_hour", String(nextHour));
+    }
 
-    const verdelingRaw = localStorage.getItem("pietje_verdeling");
+    const verdelingRaw =
+      typeof window !== "undefined" ? localStorage.getItem("pietje_verdeling") : null;
     const verdeling: number[] | null = verdelingRaw ? JSON.parse(verdelingRaw) : null;
 
-    const magVerdeling = verdeling && (spelers.length === 6 || spelers.length === 11) && verdeling.length === banen.length;
+    const magVerdeling =
+      verdeling && (spelers.length === 6 || spelers.length === 11) && verdeling.length === banen.length;
 
     if (magVerdeling) {
       const ordered = shuffle([...spelers]);
@@ -337,36 +347,19 @@ export default function Banen() {
 
       setBaanMap(map);
       setHourIndex(nextHour);
+
       if (typeof window !== "undefined") {
-  localStorage.setItem("pietje_hour", String(nextHour));
-}
-// ✅ bewaar huidige aanwezigen opnieuw (zodat je niet een oud lijstje terugkrijgt)
-if (typeof window !== "undefined") {
-  localStorage.setItem("pietje_spelers", JSON.stringify(spelers));
+        localStorage.setItem("pietje_prev_special", JSON.stringify([]));
+      }
 
-  // ✅ kleuren reset: iedereen straks grijs
-  localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
-}
-
-if (typeof window !== "undefined") {
-  // ✅ dit zegt: we komen van "volgend uur", dus straks herstellen
-  localStorage.setItem("pietje_restore", "1");
-
-  // ✅ bewaar huidige aanwezigen opnieuw
-  localStorage.setItem("pietje_spelers", JSON.stringify(spelers));
-
-  // ✅ kleuren reset: iedereen straks grijs
-  localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
-}
-
-router.push("/wie-doet-mee");
-return;
-
-
+      router.push("/wie-doet-mee");
+      return;
     }
 
     // anders: geen verdeling
-    localStorage.removeItem("pietje_verdeling");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("pietje_verdeling");
+    }
 
     const ordered = shuffle([...spelers]);
     const { map, specialNow } = buildMapMetVast(ordered, banen, prevSpecialNames, nextHour);
@@ -374,11 +367,11 @@ return;
     setBaanMap(map);
     setHourIndex(nextHour);
 
-    localStorage.setItem("pietje_prev_special", JSON.stringify(Array.from(specialNow)));
-    localStorage.setItem("pietje_hour", String(nextHour));
-router.push("/wie-doet-mee");
-return;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pietje_prev_special", JSON.stringify(Array.from(specialNow)));
+    }
 
+    router.push("/wie-doet-mee");
   }
 
   return (
