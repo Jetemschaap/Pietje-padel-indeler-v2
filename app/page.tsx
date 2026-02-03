@@ -3,6 +3,24 @@
 import Link from "next/link";
 
 export default function Home() {
+  function resetAlles() {
+    if (typeof window === "undefined") return;
+
+    // ✅ nieuwe fotoset bij nieuwe sessie
+    localStorage.removeItem("pietje_map");
+
+    // ✅ sessie/keuzes leeg
+    localStorage.removeItem("pietje_spelers");
+    localStorage.removeItem("pietje_banen");
+    localStorage.removeItem("pietje_verdeling");
+    localStorage.removeItem("pietje_prev_special");
+    localStorage.removeItem("pietje_hour");
+    localStorage.removeItem("pietje_restore");
+
+    // ✅ vaste groepen leeg (alles grijs)
+    localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
+  }
+
   return (
     <main
       style={{
@@ -41,6 +59,7 @@ export default function Home() {
       {/* Knop */}
       <Link
         href="/wie-doet-mee"
+        onClick={resetAlles}
         style={{
           width: "100%",
           maxWidth: 520,
