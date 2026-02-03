@@ -55,61 +55,33 @@ function baanVerdeling(aantalSpelers: number, aantalBanen: number): number[] | n
   return null;
 }
 
+function pickOrLoadActieveMap(): string {
+  const mappen = ["players", "players-net", "players-bobble", "beroep", "hipers", "knuffels"];
+  if (typeof window === "undefined") return "players";
+
+  const bestaand = localStorage.getItem("pietje_map");
+  if (bestaand && mappen.includes(bestaand)) return bestaand;
+
+  const gekozen = mappen[Math.floor(Math.random() * mappen.length)];
+  localStorage.setItem("pietje_map", gekozen);
+  return gekozen;
+}
+
 export default function WieDoetMee() {
   const [klaar, setKlaar] = useState(false);
 
-  useEffect(() => {
-  setKlaar(true);
+  // Aanwezigen (grijs)
+  const [geselecteerd, setGeselecteerd] = useState<string[]>([]);
 
-  const restore = localStorage.getItem("pietje_restore");
+  // Kleuren (max 4 + max 4)
+  const [geel, setGeel] = useState<string[]>([]);
+  const [groen, setGroen] = useState<string[]>([]);
 
-  if (restore === "1") {
-    const raw = localStorage.getItem("pietje_spelers");
-    const arr: { naam: string }[] = raw ? JSON.parse(raw) : [];
-    setGeselecteerd(arr.map((s) => s.naam));
+  // Banen
+  const [banen, setBanen] = useState<string[]>([]);
 
-    setVast([]);
-    localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
-
-    localStorage.removeItem("pietje_restore");
-  } else {
-    setGeselecteerd([]);
-    setVast([]);
-    localStorage.removeItem("pietje_spelers");
-    localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
-  }
-}, []);
-
-
-  useEffect(() => {
-  setKlaar(true);
-
-  const restore = localStorage.getItem("pietje_restore");
-
-  if (restore === "1") {
-    const raw = localStorage.getItem("pietje_spelers");
-    const arr: { naam: string }[] = raw ? JSON.parse(raw) : [];
-    setGeselecteerd(arr.map((s) => s.naam));
-
-    setVast([]);
-    localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
-
-    localStorage.removeItem("pietje_restore");
-  } else {
-    setGeselecteerd([]);
-    setVast([]);
-    localStorage.removeItem("pietje_spelers");
-    localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
-  }
-}, []);
-
-
-
-
-  const actieveMap = useMemo(() => {
-    const mappen = ["players", "players-net", "players-bobble", "beroep", "hipers", "knuffels"];
-    return mappen[Math.floor(Math.random() * mappen.length)];
-  }, []);
+  // Foto-set vasthouden tot reset
+  const [actieveMap] = useState<string>(() => pickOrLoadActieveMap());
 
   const spelers: Speler[] = useMemo(() => {
     return spelersBron.map((s) => ({
@@ -118,67 +90,105 @@ export default function WieDoetMee() {
     }));
   }, [actieveMap]);
 
-  // 1) aanwezig
-  const [geselecteerd, setGeselecteerd] = useState<string[]>([]);
-  // 2) vaste selectie in volgorde: eerste 4 = geel, tweede 4 = groen
-  const [vast, setVast] = useState<string[]>([]);
-  // banenkeuze
-  const [banen, setBanen] = useState<string[]>([]);
+  useEffect(() => {
+    setKlaar(true);
+
+    // Restore: dezelfde aanwezigen weer aanzetten (bij volgend uur)
+    const raw = localStorage.getItem("pietje_spelers");
+    if (raw) {
+      try {
+        const arr: { naam: string }[] = JSON.parse(raw);
+        setGeselecteerd(arr.map((s) => s.naam));
+      } catch {
+        setGeselecteerd([]);
+      }
+    } else {
+      setGeselecteerd([]);
+    }
+
+    // Banen herstellen als ze er nog staan
+    const banenRaw = localStorage.getItem("pietje_banen");
+    if (banenRaw) {
+      try {
+        const b: string[] = JSON.parse(banenRaw);
+        setBanen(b);
+      } catch {
+        setBanen([]);
+      }
+    } else {
+      setBanen([]);
+    }
+
+    // Bij binnenkomst altijd zonder kleuren (alles grijs)
+    setGeel([]);
+    setGroen([]);
+    localStorage.setItem("pietje_vast", JSON.stringify({ geel: [], groen: [] }));
+
+    // restore vlag opruimen (als hij er was)
+    localStorage.removeItem("pietje_restore");
+  }, []);
 
   function kleurVoorSpeler(naam: string): "geel" | "groen" | null {
-    const idx = vast.indexOf(naam);
-    if (idx === -1) return null;
-    if (idx < 4) return "geel";
-    if (idx < 8) return "groen";
+    if (geel.includes(naam)) return "geel";
+    if (groen.includes(naam)) return "groen";
     return null;
   }
 
-  // ✅ JOUW AFSPRAAK:
-  // 1e klik = aanwezig
-  // 2e klik = randje (geel/groen)
-  // 3e klik = randje weg -> blijft aanwezig
+  // JOUW REGEL: 1 tik aan, 2 tik geel, 3 tik groen, 4 tik uit
+  // EXTRA: als geel al 4 is, dan bij "grijs -> geel" overslaan naar groen (of uit)
   function klikSpeler(naam: string) {
-  const isAanwezig = geselecteerd.includes(naam);
-  const isVast = vast.includes(naam);
+    const aan = geselecteerd.includes(naam);
+    const isGeel = geel.includes(naam);
+    const isGroen = groen.includes(naam);
 
-  // 1e klik: niet aanwezig -> aanwezig
-  if (!isAanwezig) {
-    setGeselecteerd((prev) => [...prev, naam]);
-    return;
+    // UIT -> AAN (grijs)
+    if (!aan) {
+      setGeselecteerd((prev) => [...prev, naam]);
+      return;
+    }
+
+    // GRIJS -> GEEL (als plek, anders GRIJS -> GROEN (als plek), anders UIT)
+    if (!isGeel && !isGroen) {
+      if (geel.length < 4) {
+        setGeel((prev) => [...prev, naam]);
+        return;
+      }
+      if (groen.length < 4) {
+        setGroen((prev) => [...prev, naam]);
+        return;
+      }
+      // beide vol -> uit
+      setGeselecteerd((prev) => prev.filter((n) => n !== naam));
+      return;
+    }
+
+    // GEEL -> GROEN (als plek, anders terug naar GRIJS als groen vol)
+    if (isGeel) {
+      // eerst uit geel halen
+      setGeel((prev) => prev.filter((n) => n !== naam));
+
+      if (groen.length < 4) {
+        setGroen((prev) => [...prev, naam]);
+        return;
+      }
+      // groen vol -> wordt grijs (blijft aanwezig)
+      return;
+    }
+
+    // GROEN -> UIT
+    if (isGroen) {
+      setGroen((prev) => prev.filter((n) => n !== naam));
+      setGeselecteerd((prev) => prev.filter((n) => n !== naam));
+      return;
+    }
   }
-
-  // Als hij vast is: terug naar grijs
-  if (isVast) {
-    setVast((prev) => prev.filter((n) => n !== naam));
-    return;
-  }
-
-  // Hij is grijs (aanwezig maar niet vast)
-
-  // Als er nog plek is bij vast: maak hem vast
-  if (vast.length < 8) {
-    setVast((prev) => [...prev, naam]);
-    return;
-  }
-
-  // Anders: aanwezig uitzetten
-  setGeselecteerd((prev) => prev.filter((n) => n !== naam));
-}
-
 
   function toggleBaan(letter: string) {
     setBanen((prev) => (prev.includes(letter) ? prev.filter((b) => b !== letter) : [...prev, letter]));
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        padding: 20,
-        backgroundColor: "#000",
-        color: "#fff",
-      }}
-    >
+    <main style={{ minHeight: "100vh", padding: 20, backgroundColor: "#000", color: "#fff" }}>
       {/* SPELERS */}
       <div
         style={{
@@ -187,7 +197,7 @@ export default function WieDoetMee() {
           gap: 12,
         }}
       >
-        {spelers.map((s, i) => {
+        {spelers.map((s) => {
           const aan = geselecteerd.includes(s.naam);
           const kleur = kleurVoorSpeler(s.naam);
 
@@ -202,7 +212,7 @@ export default function WieDoetMee() {
 
           return (
             <div
-              key={s.naam + "-" + i}
+              key={s.naam}
               onClick={() => klikSpeler(s.naam)}
               style={{
                 borderRadius: 16,
@@ -226,7 +236,6 @@ export default function WieDoetMee() {
                   }}
                 />
               )}
-
               <div style={{ padding: 8, fontWeight: 800 }}>{s.naam}</div>
             </div>
           );
@@ -275,13 +284,15 @@ export default function WieDoetMee() {
           onClick={() => {
             if (banen.length === 0) return;
 
-            // ✅ REGEL A: vast moet 0, 4 of 8 zijn
-            if (![0, 4, 8].includes(vast.length)) {
+            const vastCount = geel.length + groen.length;
+
+            // vaste groep moet 0, 4 of 8 zijn
+            if (![0, 4, 8].includes(vastCount)) {
               alert("Vaste groep moet precies 4 spelers zijn (of 2 groepjes = 8).");
               return;
             }
 
-            const gekozenSpelers = spelers.filter((s) => geselecteerd.includes(s.naam));
+            const gekozenSpelers = spelers.filter((sp) => geselecteerd.includes(sp.naam));
             const verdeling = baanVerdeling(gekozenSpelers.length, banen.length);
 
             if ((gekozenSpelers.length === 6 || gekozenSpelers.length === 11) && !verdeling) {
@@ -293,16 +304,14 @@ export default function WieDoetMee() {
               return;
             }
 
-            const geel = vast.slice(0, 4);
-            const groen = vast.slice(4, 8);
-
             localStorage.setItem("pietje_spelers", JSON.stringify(gekozenSpelers));
             localStorage.setItem("pietje_banen", JSON.stringify(banen));
+
             if (verdeling) {
-  localStorage.setItem("pietje_verdeling", JSON.stringify(verdeling));
-} else {
-  localStorage.removeItem("pietje_verdeling"); // ✅ heel belangrijk (anders blijft oud hangen)
-}
+              localStorage.setItem("pietje_verdeling", JSON.stringify(verdeling));
+            } else {
+              localStorage.removeItem("pietje_verdeling");
+            }
 
             localStorage.setItem("pietje_vast", JSON.stringify({ geel, groen }));
 
