@@ -31,7 +31,8 @@ const spelersBron: SpelerBron[] = [
   { naam: "Gerard Klaui", bestand: "tijdelijk.png" },
   { naam: "Henny de Graaf", bestand: "hennydg.png" },
   { naam: "Leo Koster", bestand: "leo.png" },
-  { naam: "Invaller 1", bestand: "tijdelijk.png" },
+  { naam: "Rob Schefferlie", bestand: "robs.png" }, 
+ { naam: "Invaller 1", bestand: "tijdelijk.png" },
 ];
 
 type Speler = {
